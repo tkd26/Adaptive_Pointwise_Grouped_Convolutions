@@ -381,7 +381,8 @@ class GBlock(nn.Module):
     
     self.in_channels, self.out_channels = in_channels, out_channels
     self.which_conv, self.which_bn = which_conv, which_bn
-    self.activation = activation
+    self.activation1 = activation
+    self.activation2 = activation
     self.upsample = upsample
     # Conv layers
     self.conv1 = self.which_conv(self.in_channels, self.out_channels)
@@ -397,12 +398,12 @@ class GBlock(nn.Module):
     self.upsample = upsample
 
   def forward(self, x, y):
-    h = self.activation(self.bn1(x, y))
+    h = self.activation1(self.bn1(x, y))
     if self.upsample:
       h = self.upsample(h)
       x = self.upsample(x)
     h = self.conv1(h)
-    h = self.activation(self.bn2(h, y))
+    h = self.activation2(self.bn2(h, y))
     h = self.conv2(h)
     if self.learnable_sc:       
       x = self.conv_sc(x)
