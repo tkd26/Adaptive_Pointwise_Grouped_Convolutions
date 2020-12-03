@@ -13,6 +13,8 @@ def setup_dataloader(name,h=128,w=128,batch_size=4,num_workers=4):
         img_path_list = glob.glob("./data/face/*.png")
     elif name=="anime":
         img_path_list = glob.glob("./data/anime/*.png")
+    elif name=="flower":
+        img_path_list = glob.glob("./data/flower/*.jpg")
     else:
         raise NotImplementedError("Unknown dataset %s"%name)
         

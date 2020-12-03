@@ -118,7 +118,7 @@ def setup_model(name,dataset_size,resume=None,biggan_imagenet_pretrained_model_p
         G = biggan.Generator(**bigagn128config)
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
         model = AdaBIGGAN(G,dataset_size=dataset_size)
-    elif name=="biggan128-conv1x1":
+    elif "biggan128-conv1x1" in name:
         G = biggan.Generator(**bigagn128config)
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
         model = AdaBIGGAN_conv1x1(G,dataset_size=dataset_size)
