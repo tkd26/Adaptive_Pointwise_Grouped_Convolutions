@@ -4,7 +4,6 @@
 import torch
 import torchvision
 import torch.nn as nn
-from torch.nn.utils.weight_norm import weight_norm
 
 
 class AdaBIGGAN(nn.Module):
@@ -39,19 +38,12 @@ class AdaBIGGAN(nn.Module):
         # blockのconv1x1
         self.conv1x1 = []
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
-            conv = nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0).cuda()
-            conv = weight_norm(conv)
-            conv.weight.data.fill_(1.)
-            conv.bias.data.fill_(0)
-            self.conv1x1 += [conv]
+            self.conv1x1 += [nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0).cuda()]
         self.conv1x1 = nn.ModuleList(self.conv1x1)
 
         # 最初のレイヤのconv1x1
         in_ch = self.generator.blocks[0][0].conv1.in_channels
         self.conv1x1_first = nn.Conv2d(in_ch, in_ch, kernel_size=1, stride=1, padding=0).cuda()
-        self.conv1x1_first = weight_norm(self.conv1x1_first)
-        self.conv1x1_first.weight.data.fill_(1.)
-        self.conv1x1_first.bias.data.fill_(0)
         
         self.set_training_parameters()
                 
@@ -103,16 +95,16 @@ class AdaBIGGAN(nn.Module):
             for block_idx, block in enumerate(blocklist):
                 if block_idx==0:
                     x = h
-                    h = block.bn1(x, ys[index])
                     g = self.conv1x1[i](h)
+                    h = block.bn1(x, ys[index])
                     h = g + h
                     h = block.activation1(h)
                     h = block.upsample(h)
                     x = block.upsample(x)
                     h = block.conv1(h)
 
-                    h = block.bn2(h, ys[index])
                     g = self.conv1x1[i+1](h)
+                    h = block.bn2(h, ys[index])
                     h = g + h
                     h = block.activation2(h)
                     h = block.conv2(h) 

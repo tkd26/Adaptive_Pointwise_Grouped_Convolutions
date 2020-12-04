@@ -17,7 +17,7 @@ from loss.AdaBIGGANLoss import AdaBIGGANLoss
 
 def argparse_setup():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str, default="anime", help = "dataset. anime or face. ")
+    parser.add_argument('--dataset', type=str, default="anime", help = "dataset. anime or face or flower. ")
     parser.add_argument('--pretrained', type=str, default="./data/G_ema.pth", help = "pretrained BigGAN model")
 
 
@@ -99,6 +99,18 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
         params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
         params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear })
         params.append({"params":list(model.bsa_linear_params().values()), "lr":lr_bsa_linear })
+        params.append({"params":list(model.emebeddings_params().values()), "lr": lr_embed })
+        params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
+    elif model_name=='biggan128-ResConv1x1':
+        params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
+        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear })
+        params.append({"params":list(model.emebeddings_params().values()), "lr": lr_embed })
+        params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
+    elif model_name=='biggan128-Res2Conv1x1':
+        params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
+        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear })
         params.append({"params":list(model.emebeddings_params().values()), "lr": lr_embed })
         params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
 

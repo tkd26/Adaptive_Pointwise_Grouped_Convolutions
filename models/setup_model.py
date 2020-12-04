@@ -6,6 +6,8 @@ from . import BigGAN as biggan
 from .AdaBIGGAN import AdaBIGGAN
 from .AdaBIGGAN_conv1x1 import AdaBIGGAN as AdaBIGGAN_conv1x1
 from .AdaBIGGAN_MixConv1x1 import AdaBIGGAN as AdaBIGGAN_MixConv1x1
+from .AdaBIGGAN_ResConv1x1 import AdaBIGGAN as AdaBIGGAN_ResConv1x1
+from .AdaBIGGAN_Res2Conv1x1 import AdaBIGGAN as AdaBIGGAN_Res2Conv1x1
 
 # taken from https://github.com/ajbrock/BigGAN-PyTorch/issues/8
 bigagn128config = {'dataset': 'I128_hdf5',
@@ -119,14 +121,22 @@ def setup_model(name,dataset_size,resume=None,biggan_imagenet_pretrained_model_p
         G = biggan.Generator(**bigagn128config)
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
         model = AdaBIGGAN(G,dataset_size=dataset_size)
+    elif name == "biggan128-MixConv1x1":
+        G = biggan.Generator(**bigagn128config)
+        G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
+        model = AdaBIGGAN_MixConv1x1(G,dataset_size=dataset_size)
+    elif name == "biggan128-ResConv1x1":
+        G = biggan.Generator(**bigagn128config)
+        G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
+        model = AdaBIGGAN_ResConv1x1(G,dataset_size=dataset_size)
+    elif name == "biggan128-Res2Conv1x1":
+        G = biggan.Generator(**bigagn128config)
+        G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
+        model = AdaBIGGAN_Res2Conv1x1(G,dataset_size=dataset_size)
     elif "biggan128-conv1x1" in name:
         G = biggan.Generator(**bigagn128config)
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
         model = AdaBIGGAN_conv1x1(G,dataset_size=dataset_size)
-    elif "biggan128-MixConv1x1" in name:
-        G = biggan.Generator(**bigagn128config)
-        G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
-        model = AdaBIGGAN_MixConv1x1(G,dataset_size=dataset_size)
     else:
         print("%s (model name) is not defined"%name)
         raise NotImplementedError()
