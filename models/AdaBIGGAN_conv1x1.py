@@ -39,11 +39,13 @@ class AdaBIGGAN(nn.Module):
         self.conv1x1 = []
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
             conv = nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0).cuda()
-            conv = weight_norm(conv)
+            weight_init = torch.eye(conv.weight.data.shape[0]).unsqueeze(-1).unsqueeze(-1)
+            # print(weight_init.shape)
+            conv.weight.data = weight_init
+            conv.bias.data.fill_(0)
             # torch.nn.init.xavier_uniform_(conv.weight)
-            torch.nn.init.kaiming_normal_(conv.weight)
-            # conv.weight.data.fill_(1.)
-            # conv.bias.data.fill_(0)
+            # torch.nn.init.kaiming_normal_(conv.weight)
+            conv = weight_norm(conv)
             self.conv1x1 += [conv]
         self.conv1x1 = nn.ModuleList(self.conv1x1)
 
@@ -66,11 +68,11 @@ class AdaBIGGAN(nn.Module):
         # 最初のレイヤのconv1x1
         in_ch = self.generator.blocks[0][0].conv1.in_channels
         self.conv1x1_first = nn.Conv2d(in_ch, in_ch, kernel_size=1, stride=1, padding=0).cuda()
-        self.conv1x1_first = weight_norm(self.conv1x1_first)
-        # torch.nn.init.xavier_uniform_(self.conv1x1_first.weight)
-        torch.nn.init.kaiming_normal_(self.conv1x1_first.weight)
         # self.conv1x1_first.weight.data.fill_(1.)
         # self.conv1x1_first.bias.data.fill_(0)
+        # torch.nn.init.kaiming_normal_(self.conv1x1_first.weight)
+        self.conv1x1_first = weight_norm(self.conv1x1_first)
+        
         
         self.set_training_parameters()
                 
@@ -109,7 +111,7 @@ class AdaBIGGAN(nn.Module):
         h = self.generator.linear(z)
         # Reshape
         h = h.view(h.size(0), -1, self.generator.bottom_width, self.generator.bottom_width)
-        h = self.conv1x1_first(h)
+        # h = self.conv1x1_first(h)
         
         #Do scale and bias (i.e. apply newly intoroduced statistic parameters) for the first linear layer
         # h = h*self.bsa_linear_scale.view(1,-1,1,1) + self.bsa_linear_bias.view(1,-1,1,1) 
@@ -135,7 +137,7 @@ class AdaBIGGAN(nn.Module):
             
         named_params_requires_grad = {}
         # named_params_requires_grad.update(self.batch_stat_gen_params())
-        named_params_requires_grad.update(self.linear_gen_params())
+        # named_params_requires_grad.update(self.linear_gen_params())
         # named_params_requires_grad.update(self.bsa_linear_params())
         named_params_requires_grad.update(self.calss_conditional_embeddings_params())
         named_params_requires_grad.update(self.emebeddings_params())

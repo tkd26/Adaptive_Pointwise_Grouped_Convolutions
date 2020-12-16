@@ -115,6 +115,7 @@ bigagn128config = {'dataset': 'I128_hdf5',
  'no_optim': True,
  'device': 'cpu'}
 
+
 def setup_model(name,dataset_size,resume=None,biggan_imagenet_pretrained_model_path="./data/G_ema.pth"):
     print("model name:",name)
     if name=="biggan128-ada":

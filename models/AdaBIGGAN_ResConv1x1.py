@@ -40,18 +40,19 @@ class AdaBIGGAN(nn.Module):
         self.conv1x1 = []
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
             conv = nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0).cuda()
-            conv = weight_norm(conv)
-            conv.weight.data.fill_(1.)
-            conv.bias.data.fill_(0)
+            # torch.nn.init.xavier_uniform_(conv.weight)
+            # torch.nn.init.kaiming_normal_(conv.weight)
+            # conv = weight_norm(conv)
             self.conv1x1 += [conv]
         self.conv1x1 = nn.ModuleList(self.conv1x1)
 
         # 最初のレイヤのconv1x1
         in_ch = self.generator.blocks[0][0].conv1.in_channels
         self.conv1x1_first = nn.Conv2d(in_ch, in_ch, kernel_size=1, stride=1, padding=0).cuda()
-        self.conv1x1_first = weight_norm(self.conv1x1_first)
-        self.conv1x1_first.weight.data.fill_(1.)
-        self.conv1x1_first.bias.data.fill_(0)
+        torch.nn.init.kaiming_normal_(self.conv1x1_first.weight)
+        # self.conv1x1_first = weight_norm(self.conv1x1_first)
+        # self.conv1x1_first.weight.data.fill_(1.)
+        # self.conv1x1_first.bias.data.fill_(0)
         
         self.set_training_parameters()
                 
@@ -150,7 +151,11 @@ class AdaBIGGAN(nn.Module):
             param.requires_grad = True
 
     def conv1x1_first_params(self):
-        return {"conv1x1_first.weight":self.conv1x1_first.weight,"conv1x1_first.bias":self.conv1x1_first.bias}
+        return {
+            # "conv1x1_first.weight_g":self.conv1x1_first.weight_g,
+            # "conv1x1_first.weight_v":self.conv1x1_first.weight_v,
+            "conv1x1_first.weight":self.conv1x1_first.weight,
+            "conv1x1_first.bias":self.conv1x1_first.bias}
 
 
     def conv1x1_params(self):

@@ -38,7 +38,11 @@ class AdaBIGGAN(nn.Module):
         # blockのconv1x1
         self.conv1x1 = []
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
-            self.conv1x1 += [nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0).cuda()]
+            conv = nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0).cuda()
+            weight_init = torch.eye(conv.weight.data.shape[0]).unsqueeze(-1).unsqueeze(-1)
+            conv.weight.data = weight_init
+            conv.bias.data.fill_(0)
+            self.conv1x1 += [conv]
         self.conv1x1 = nn.ModuleList(self.conv1x1)
 
         # 最初のレイヤのconv1x1
