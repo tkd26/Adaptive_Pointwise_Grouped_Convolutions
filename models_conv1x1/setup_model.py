@@ -4,10 +4,10 @@ import torch.nn as nn
 
 from . import BigGAN as biggan
 from .AdaBIGGAN import AdaBIGGAN
-# from .AdaBIGGAN_conv1x1 import AdaBIGGAN as AdaBIGGAN_conv1x1
-# from .AdaBIGGAN_MixConv1x1 import AdaBIGGAN as AdaBIGGAN_MixConv1x1
-# from .AdaBIGGAN_ResConv1x1 import AdaBIGGAN as AdaBIGGAN_ResConv1x1
-# from .AdaBIGGAN_Res2Conv1x1 import AdaBIGGAN as AdaBIGGAN_Res2Conv1x1
+from .AdaBIGGAN_conv1x1 import AdaBIGGAN as AdaBIGGAN_conv1x1
+from .AdaBIGGAN_MixConv1x1 import AdaBIGGAN as AdaBIGGAN_MixConv1x1
+from .AdaBIGGAN_ResConv1x1 import AdaBIGGAN as AdaBIGGAN_ResConv1x1
+from .AdaBIGGAN_Res2Conv1x1 import AdaBIGGAN as AdaBIGGAN_Res2Conv1x1
 
 # taken from https://github.com/ajbrock/BigGAN-PyTorch/issues/8
 bigagn128config = {'dataset': 'I128_hdf5',

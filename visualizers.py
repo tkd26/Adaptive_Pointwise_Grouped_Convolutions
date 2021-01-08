@@ -60,3 +60,25 @@ def random(model,out_path,tmp=0.4, n=9, truncate=False):
                 nrow=int(batch_size ** 0.5),
                 normalize=True,
             )
+
+def random_eval(model,out_path,tmp=0.4, n=100, truncate=False, roop_n=0):
+    with torch.no_grad():
+        model.eval()
+        device = next(model.parameters()).device
+        dataset_size = model.embeddings.weight.size()[0]
+        dim_z = model.embeddings.weight.size(1)
+        if truncate:
+            embeddings = truncnorm(-tmp, tmp).rvs(n * dim_z).astype("float32").reshape(n, dim_z)
+        else:
+            embeddings = np.random.normal(0, tmp, size=(n, dim_z)).astype("float32")
+        embeddings = torch.tensor(embeddings,device=device)
+        batch_size = embeddings.size()[0]
+        image_tensors = model(embeddings)
+
+        for i,image in enumerate(image_tensors):
+            torchvision.utils.save_image(
+                    image,
+                    out_path+str(roop_n*100+i).zfill(5)+'.jpg',
+                    nrow=1,
+                    normalize=True,
+                )

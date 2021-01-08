@@ -323,8 +323,8 @@ class ccbn(nn.Module):
         out = groupnorm(x, self.normstyle)
       elif self.norm_style == 'nonorm':
         out = x
-      return out * gain + bias
-    #   return out
+    #   return out * gain + bias
+      return out
   def extra_repr(self):
     s = 'out: {output_size}, in: {input_size},'
     s +=' cross_replica={cross_replica}'

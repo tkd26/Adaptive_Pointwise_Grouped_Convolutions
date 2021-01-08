@@ -1,5 +1,6 @@
 data
 samples
 experiments
+outputs
 official_biggan_pytorch
 *.txt

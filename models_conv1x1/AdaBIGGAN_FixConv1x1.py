@@ -41,10 +41,11 @@ class AdaBIGGAN(nn.Module):
             conv = nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0).cuda()
             weight_init = torch.eye(conv.weight.data.shape[0]).unsqueeze(-1).unsqueeze(-1)
             # print(weight_init.shape)
-            conv.weight.data = weight_init
             conv.bias.data.fill_(0)
+            conv.weight.data.fill_(0)
             # torch.nn.init.xavier_uniform_(conv.weight)
             # torch.nn.init.kaiming_normal_(conv.weight)
+            conv.weight.data[weight_init==1.] = 1.
             conv = weight_norm(conv)
             self.conv1x1 += [conv]
         self.conv1x1 = nn.ModuleList(self.conv1x1)

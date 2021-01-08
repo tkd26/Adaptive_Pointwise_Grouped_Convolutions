@@ -4,7 +4,7 @@
 import torch
 import torchvision
 import torch.nn as nn
-
+from torch.nn.utils.weight_norm import weight_norm
 
 class AdaBIGGAN(nn.Module):
     def __init__(self,generator, dataset_size, embed_dim=120, shared_embed_dim = 128,cond_embed_dim = 20,embedding_init="zero"):
@@ -40,14 +40,44 @@ class AdaBIGGAN(nn.Module):
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
             conv = nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0).cuda()
             weight_init = torch.eye(conv.weight.data.shape[0]).unsqueeze(-1).unsqueeze(-1)
-            conv.weight.data = weight_init
-            conv.bias.data.fill_(0)
+            # print(weight_init.shape)
+            # conv.bias.data.fill_(0)
+            # conv.weight.data.fill_(0)
+            # torch.nn.init.xavier_uniform_(conv.weight)
+            # torch.nn.init.kaiming_normal_(conv.weight)
+            # conv.weight.data[weight_init==1.] = 1.
+            conv = weight_norm(conv)
             self.conv1x1 += [conv]
         self.conv1x1 = nn.ModuleList(self.conv1x1)
+
+        i = 0
+        for index, blocklist in enumerate(self.generator.blocks):
+            for block in blocklist:
+                try:
+                    block.activation1 =  nn.Sequential(
+                        self.conv1x1[i], 
+                        block.activation1
+                    )
+                    block.activation2 =  nn.Sequential(
+                        self.conv1x1[i+1],
+                        block.activation2
+                    )
+                    i += 2
+                except:
+                    continue
 
         # 最初のレイヤのconv1x1
         in_ch = self.generator.blocks[0][0].conv1.in_channels
         self.conv1x1_first = nn.Conv2d(in_ch, in_ch, kernel_size=1, stride=1, padding=0).cuda()
+        # self.conv1x1_first.weight.data.fill_(1.)
+        # self.conv1x1_first.bias.data.fill_(0)
+
+        # weight_init = torch.eye(conv.weight.data.shape[0]).unsqueeze(-1).unsqueeze(-1)
+        # conv.weight.data[weight_init==1.] = 1.
+
+        # torch.nn.init.kaiming_normal_(self.conv1x1_first.weight)
+        # torch.nn.init.xavier_uniform_(self.conv1x1_first.weight)
+        # self.conv1x1_first = weight_norm(self.conv1x1_first)
         
         self.set_training_parameters()
                 
@@ -86,39 +116,16 @@ class AdaBIGGAN(nn.Module):
         h = self.generator.linear(z)
         # Reshape
         h = h.view(h.size(0), -1, self.generator.bottom_width, self.generator.bottom_width)
-        g = self.conv1x1_first(h)
-        h = g + h
+        h = self.conv1x1_first(h)
         
         #Do scale and bias (i.e. apply newly intoroduced statistic parameters) for the first linear layer
         # h = h*self.bsa_linear_scale.view(1,-1,1,1) + self.bsa_linear_bias.view(1,-1,1,1) 
         
         # Loop over blocks
-        i = 0
         for index, blocklist in enumerate(self.generator.blocks):
             # Second inner loop in case block has multiple layers
-            for block_idx, block in enumerate(blocklist):
-                if block_idx==0:
-                    x = h
-                    g = self.conv1x1[i](h)
-                    h = block.bn1(x, ys[index])
-                    h = g + h
-                    h = block.activation1(h)
-                    h = block.upsample(h)
-                    x = block.upsample(x)
-                    h = block.conv1(h)
-
-                    g = self.conv1x1[i+1](h)
-                    h = block.bn2(h, ys[index])
-                    h = g + h
-                    h = block.activation2(h)
-                    h = block.conv2(h) 
-                    x = block.conv_sc(x)
-                    h = h + x
-
-                    i += 2
-                elif block_idx==1: # Attentionの場合
-                    h = block(h)
-
+            for block in blocklist:
+                h = block(h, ys[index])
 
         # Apply batchnorm-relu-conv-tanh at output
         return torch.tanh(self.generator.output_layer(h))
@@ -134,11 +141,18 @@ class AdaBIGGAN(nn.Module):
             param.requires_grad = False
             
         named_params_requires_grad = {}
-        # named_params_requires_grad.update(self.batch_stat_gen_params())
-        named_params_requires_grad.update(self.linear_gen_params())
+        # --最初以降のbnのパラメータ生成（1x1convでは使用しない）
+        # named_params_requires_grad.update(self.batch_stat_gen_params()) 
+        # --最初のlinear層
+        named_params_requires_grad.update(self.linear_gen_params()) 
+        # --最初のlinear層のパラメータ（1x1convでは使用しない）
         # named_params_requires_grad.update(self.bsa_linear_params())
-        named_params_requires_grad.update(self.calss_conditional_embeddings_params())
-        named_params_requires_grad.update(self.emebeddings_params())
+        # --bnのパラメータ生成に使うベクトルを入れるlinear（1x1convでは使用しない）
+        # named_params_requires_grad.update(self.calss_conditional_embeddings_params())
+        # --ベクトルをembeddingする（1x1convでは使用しない）
+        named_params_requires_grad.update(self.embeddings_params())
+
+        # --1x1convに関するもの
         named_params_requires_grad.update(self.conv1x1_params())
         named_params_requires_grad.update(self.conv1x1_first_params())
         
@@ -147,6 +161,10 @@ class AdaBIGGAN(nn.Module):
 
     def conv1x1_first_params(self):
         return {"conv1x1_first.weight":self.conv1x1_first.weight,"conv1x1_first.bias":self.conv1x1_first.bias}
+        # return {
+        #     "conv1x1_first.weight_g":self.conv1x1_first.weight_g,
+        #     "conv1x1_first.weight_v":self.conv1x1_first.weight_v,
+        #     "conv1x1_first.bias":self.conv1x1_first.bias}
 
 
     def conv1x1_params(self):
@@ -243,7 +261,7 @@ class AdaBIGGAN(nn.Module):
         return {"linear.weight":self.linear.weight}
 
 
-    def emebeddings_params(self):
+    def embeddings_params(self):
         '''
         initialized with zero but added with random epsilon for training time
         this is 120 in the BigGAN 128 x 128 while 140 in 256 x 256
@@ -253,7 +271,7 @@ class AdaBIGGAN(nn.Module):
     
 if __name__ == "__main__":
     import sys
-    sys.path.append("./official_biggan_pytorch/")
+    sys.path.append("../official_biggan_pytorch/")
     sys.path.append("../")
     from official_biggan_pytorch import utils
     
