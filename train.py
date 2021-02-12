@@ -14,11 +14,7 @@ from utils import gpu_setup,savedir_setup,save_args,save_json,check_githash,save
 import visualizers
 from metrics.AverageMeter import AverageMeter
 from dataloaders.setup_dataloader_smallgan import setup_dataloader
-# from models.setup_model import setup_model
-# from models_conv1x1.setup_model import setup_model as setup_model_conv1x1
-# from models_conv1x1_2.setup_model import setup_model as setup_model_conv1x1_2
-# from models_depthwise.setup_model import setup_model as setup_model_depthwise
-from models import setup_model
+from models.setup_model import setup_model
 from loss.AdaBIGGANLoss import AdaBIGGANLoss
 from loss.KMMD import KMMD
 
