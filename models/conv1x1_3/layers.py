@@ -306,8 +306,8 @@ class ccbn(nn.Module):
     
   def forward(self, x, y):
     # Calculate class-conditional gains and biases
-    gain = (1 + self.gain(y)).view(y.size(0), -1, 1, 1)
-    bias = self.bias(y).view(y.size(0), -1, 1, 1)
+    # gain = (1 + self.gain(y)).view(y.size(0), -1, 1, 1)
+    # bias = self.bias(y).view(y.size(0), -1, 1, 1)
     # If using my batchnorm
     if self.mybn or self.cross_replica:
       return self.bn(x, gain=gain, bias=bias)
