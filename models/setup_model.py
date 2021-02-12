@@ -5,10 +5,12 @@ import torch.nn as nn
 from .original import BigGAN as biggan_original
 from .conv1x1 import BigGAN as biggan_conv1x1
 from .conv1x1_2 import BigGAN as biggan_conv1x1_2
+from .conv1x1_3 import BigGAN as biggan_conv1x1_3
 
 from .original.AdaBIGGAN import AdaBIGGAN
 from .conv1x1.AdaBIGGAN_conv1x1 import AdaBIGGAN as AdaBIGGAN_conv1x1
-from .conv1x1_2.AdaBIGGAN_conv1x1 import AdaBIGGAN as AdaBIGGAN_conv1x1_2
+from .conv1x1_2.AdaBIGGAN_conv1x1_2 import AdaBIGGAN as AdaBIGGAN_conv1x1_2
+from .conv1x1_3.AdaBIGGAN_conv1x1_3 import AdaBIGGAN as AdaBIGGAN_conv1x1_3
 
 # taken from https://github.com/ajbrock/BigGAN-PyTorch/issues/8
 bigagn128config = {'dataset': 'I128_hdf5',
@@ -129,6 +131,10 @@ def setup_model(name,dataset_size,resume=None,biggan_imagenet_pretrained_model_p
         model = AdaBIGGAN_conv1x1(G,dataset_size=dataset_size)
     elif name=="biggan128-conv1x1-2":
         G = biggan_conv1x1_2.Generator(**bigagn128config)
+        G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
+        model = AdaBIGGAN_conv1x1_2(bigagn128config,G,dataset_size=dataset_size,groups=groups)
+    elif name=="biggan128-conv1x1-3":
+        G = biggan_conv1x1_3.Generator(**bigagn128config)
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
         model = AdaBIGGAN_conv1x1_2(bigagn128config,G,dataset_size=dataset_size,groups=groups)
     else:
