@@ -7,63 +7,58 @@ import torch.nn as nn
 from torch.nn.utils.weight_norm import weight_norm
 
 class AdaBIGGAN(nn.Module):
-    def __init__(self, config, generator, dataset_size, embed_dim=120, shared_embed_dim = 128,cond_embed_dim = 20,embedding_init="zero", groups=1):
-        '''
-        generator: original big gan generator
-        dataset_size: (small) number of training images. It should be less than 100. If more than 100, it's better to fine tune using normal adverserial training
-        shared_embed_dim: class shared embedding dim. 
-        cond_embed_dim: class conditional embedding dim
-        See Generator row 2 in table 4 in the BigGAN paper (1809.11096v2) where Linear(20+129), which means Linear(cond_embed_dim+shared_embed_dim) 
-        '''
+    def __init__(self, config, generator, dataset_size, embed_dim=120, shared_embed_dim = 128,cond_embed_dim = 20,embedding_init="zero", per_groups=0):
         super(AdaBIGGAN,self).__init__()
 
         self.config = config
-        self.groups = groups
-        print('groups',groups)
+        self.per_groups = per_groups
+        print('per_groups',per_groups)
         self.generator = generator
         #same as z in the chainer implementation
         self.embeddings = nn.Embedding(dataset_size, embed_dim)
         if embedding_init == "zero":
             self.embeddings.from_pretrained(torch.zeros(dataset_size,embed_dim),freeze=False)
         
-        # ---------------------------------------------------------
-
+        '''
+        -- embedding用のzの定義 --
+            in_channels：zを入力する中間レイヤのチャネルのリスト
+            num_slots：zを分割する数（入力＋挿入する中間レイヤ数）
+            z_chunk_size：zベクトルを分割した時の，1つのベクトルのサイズ（割り切れるように）
+            dim_z：num_slots数で割り切れるzのサイズ
+        '''
         in_channels = [64 * item for item in [16, 16, 8, 4]]
         self.num_slots = len(in_channels) + 1 # 5
         self.z_chunk_size = (self.config['dim_z'] // self.num_slots) # 120 // 5 = 24
         self.dim_z = self.z_chunk_size *  self.num_slots
-        
+
+        '''
+        -- conv1x1のパラメータを生成するFC層の定義 --
+            in_size：FC層へ与えられるzベクトルのサイズ
+            conv1x1_paramG_weights：conv1x1の重みを生成するFC層のリスト
+            conv1x1_paramG_biases：conv1x1のバイアスを生成するFC層のリスト
+            conv1x1_first_paramG_weight：最初のconv1x1の重みを生成するFC層のリスト
+            conv1x1_first_paramG_bias：最初のconv1x1のバイアスを生成するFC層のリスト
+        '''
         in_size = 148
         self.conv1x1_paramG_weights = []
         self.conv1x1_paramG_biases = []
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
-            self.conv1x1_paramG_weights += [nn.Linear(int(in_size), int(ch*ch/self.groups))]
+            if self.per_groups==0: groups = ch
+            else: groups = ch //self.per_groups
+            self.conv1x1_paramG_weights += [nn.Linear(int(in_size), int(ch*ch/groups))]
             self.conv1x1_paramG_biases += [nn.Linear(int(in_size), int(ch))]
-            # self.conv1x1_paramG_weights += [
-            #     nn.Sequential(
-            #         nn.Linear(int(in_size), int(ch*ch/self.groups//48)),
-            #         # nn.Linear(int(ch*ch/self.groups//16), int(ch*ch/self.groups//8)),
-            #         # nn.Linear(int(ch*ch/self.groups//8), int(ch*ch/self.groups//4)),
-            #         # nn.Linear(int(ch*ch/self.groups//4), int(ch*ch/self.groups//2)),
-            #         nn.Linear(int(ch*ch/self.groups//48), int(ch*ch/self.groups)),
-            #     )]
-            # self.conv1x1_paramG_biases += [
-            #     nn.Sequential(
-            #         nn.Linear(int(in_size), int(ch//48)),
-            #         # nn.Linear(int(ch//16), int(ch//8)),
-            #         # nn.Linear(int(ch//8), int(ch//4)),
-            #         # nn.Linear(int(ch//4), int(ch//2)),
-            #         nn.Linear(int(ch//48), int(ch)),
-            #         )]
         self.conv1x1_paramG_weights = nn.ModuleList(self.conv1x1_paramG_weights)
         self.conv1x1_paramG_biases = nn.ModuleList(self.conv1x1_paramG_biases)
 
         ch_first = self.generator.blocks[0][0].conv1.in_channels
-        self.conv1x1_first_paramG_weight = nn.Linear(int(in_size), int(ch_first*ch_first/self.groups))
+        groups = ch_first //self.per_groups
+        self.conv1x1_first_paramG_weight = nn.Linear(int(in_size), int(ch_first*ch_first/groups))
         self.conv1x1_first_paramG_bias = nn.Linear(int(in_size), int(ch_first))
 
-        # ---------------------------------------------------------
-
+        '''
+        -- zベクトルに付与するconditionalベクトルが通過するlinear --
+        * 今回の実験ではconditionを指定しないので使用しない
+        '''
         self.linear = nn.Linear(1, shared_embed_dim, bias=False)
         #torch.nn.init.kaiming_normal_(self.linear.weight)
         init_weight = generator.shared.weight.mean(dim=0,keepdim=True).transpose(1,0)
@@ -71,11 +66,16 @@ class AdaBIGGAN(nn.Module):
         self.linear.weight.data  = init_weight
         del generator.shared
 
-
+        '''
+        -- 1x1convの定義 --
+            conv1x1：1x1convのリスト
+            conv1x1_first：最初の1x1conv
+        '''
         # blockのconv1x1
         self.conv1x1 = []
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
-            conv = nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0, groups=self.groups).cuda()
+            groups = ch //self.per_groups
+            conv = nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0, groups=groups).cuda()
             weight_init = torch.eye(conv.weight.data.shape[0]).unsqueeze(-1).unsqueeze(-1)
             # print(conv.weight.data.shape, conv.bias.data.shape)
             self.conv1x1 += [conv]
@@ -83,7 +83,8 @@ class AdaBIGGAN(nn.Module):
 
         # 最初のレイヤのconv1x1
         in_ch = self.generator.blocks[0][0].conv1.in_channels
-        self.conv1x1_first = nn.Conv2d(in_ch, in_ch, kernel_size=1, stride=1, padding=0, groups=self.groups).cuda()
+        groups = in_ch //self.per_groups
+        self.conv1x1_first = nn.Conv2d(in_ch, in_ch, kernel_size=1, stride=1, padding=0, groups=groups).cuda()
         
         self.set_training_parameters()
                 
@@ -91,21 +92,17 @@ class AdaBIGGAN(nn.Module):
         '''
         z: tensor whose shape is (batch_size, shared_embed_dim) . in the training time noise (`epsilon` in the original paper) should be added. 
         '''
-        #originally copied from the biggan repo
-        #https://github.com/ajbrock/BigGAN-PyTorch/blob/ba3d05754120e9d3b68313ec7b0f9833fc5ee8bc/BigGAN.py#L226-L251
-        #then modified to do the same job in chainer smallgan repo
-        #https://github.com/nogu-atsu/SmallGAN/blob/2293700dce1e2cd97e25148543532814659516bd/gen_models/ada_generator.py#L278-L294
-
-        #original note, as original one use `forward(self, z, y)` (notice y)
-        ##Note on this forward function: we pass in a y vector which has
-        ##already been passed through G.shared to enable easy class-wise
-        ##interpolation later. If we passed in the one-hot and then ran it through
-        ##G.shared in this forward function, it would be harder to handle.
-
         #my note
         #here, we *do* make `y` inside forwad function
         #`y` is equivalent to `c` in chainer smallgan repo
 
+        '''
+        -- zベクトルと各レイヤへ与えるベクトルの生成 --
+            y：conditionベクトル（バッチサイズ*128）
+            z：zベクトル
+            ys：各レイヤへ与えるベクトル
+        '''
+        # conditionベクトルの生成
         y = torch.ones((z.shape[0], 1),dtype=torch.float32,device=z.device)#z.shape[0] is batch size
         y = self.linear(y) # batch * 128
 
@@ -118,6 +115,10 @@ class AdaBIGGAN(nn.Module):
             raise NotImplementedError("I don't implement this case")
             ys = [y] * len(self.generator.blocks)
 
+        '''
+        -- 最初の1x1conv --
+        * 現在は不使用
+        '''
         # First linear layer
         h = self.generator.linear(z)
         # Reshape
@@ -132,10 +133,9 @@ class AdaBIGGAN(nn.Module):
         # h = torch.sum(h, dim=2).squeeze(2)
         # h += conv1x1_first_bias
         
-        #Do scale and bias (i.e. apply newly intoroduced statistic parameters) for the first linear layer
-        # h = h*self.bsa_linear_scale.view(1,-1,1,1) + self.bsa_linear_bias.view(1,-1,1,1) 
-        
-# Loop over blocks
+        '''
+        -- 2層目以降の処理 --
+        '''
         i = 0
         for index, blocklist in enumerate(self.generator.blocks):
             # Second inner loop in case block has multiple layers
@@ -148,8 +148,7 @@ class AdaBIGGAN(nn.Module):
                     x = h
                     h = block.bn1(x, ys[index])
 
-                    # h = self.conv1x1[i](h)
-
+                    # h = self.conv1x1[i](h)の代わりの計算
                     conv1x1_1_weight = conv1x1_1_weight.repeat(1,1,1,h.shape[2],h.shape[3])
                     conv1x1_1_bias = conv1x1_1_bias.unsqueeze(-1).unsqueeze(-1).repeat(1,1,h.shape[2],h.shape[3])
                     h = h.unsqueeze(2) * conv1x1_1_weight
@@ -167,8 +166,7 @@ class AdaBIGGAN(nn.Module):
 
                     h = block.bn2(h, ys[index])
 
-                    # h = self.conv1x1[i+1](h)
-
+                    # h = self.conv1x1[i+1](h)の代わりの計算
                     conv1x1_2_weight = conv1x1_2_weight.repeat(1,1,1,h.shape[2],h.shape[3])
                     conv1x1_2_bias = conv1x1_2_bias.unsqueeze(-1).unsqueeze(-1).repeat(1,1,h.shape[2],h.shape[3])
                     h = h.unsqueeze(2) * conv1x1_2_weight

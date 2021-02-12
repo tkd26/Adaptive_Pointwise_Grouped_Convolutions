@@ -119,7 +119,7 @@ bigagn128config = {'dataset': 'I128_hdf5',
  'device': 'cpu'}
 
 
-def setup_model(name,dataset_size,resume=None,biggan_imagenet_pretrained_model_path="./data/G_ema.pth",groups=1):
+def setup_model(name,dataset_size,resume=None,biggan_imagenet_pretrained_model_path="./data/G_ema.pth",groups=1, per_groups=0):
     print("model name:",name)
     if name=="biggan128-ada":
         G = biggan_original.Generator(**bigagn128config)
@@ -136,7 +136,7 @@ def setup_model(name,dataset_size,resume=None,biggan_imagenet_pretrained_model_p
     elif name=="biggan128-conv1x1-3":
         G = biggan_conv1x1_3.Generator(**bigagn128config)
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
-        model = AdaBIGGAN_conv1x1_2(bigagn128config,G,dataset_size=dataset_size,groups=groups)
+        model = AdaBIGGAN_conv1x1_3(bigagn128config,G,dataset_size=dataset_size,per_groups=per_groups)
     else:
         print("%s (model name) is not defined"%name)
         raise NotImplementedError()

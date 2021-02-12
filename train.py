@@ -53,6 +53,7 @@ def argparse_setup():
     parser.add_argument('--workers', type=int, default=4, help="number of processes to make batch worker. default is 8")
     parser.add_argument('--model', type=str,default = "biggan128-ada", help = "model. biggan128-ada")
     parser.add_argument('--groups', type=int, default=1, help="")
+    parser.add_argument('--per_groups', type=int, default=0, help="ch/per_groups")
 
     parser.add_argument('--resume', type=str, default=None, help="model weights to resume")
     parser.add_argument('--savedir',  default = "train", help='Output directory')
@@ -77,13 +78,7 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
         params.append({"params":list(model.bsa_linear_params().values()), "lr":lr_bsa_linear })
         params.append({"params":list(model.emebeddings_params().values()), "lr": lr_embed })
         params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
-    elif model_name=='biggan128-GroupICConv1x1':
-        params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
-        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
-        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
-        params.append({"params":list(model.embeddings_params().values()), "lr": lr_embed })
-        # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
-    elif model_name=='biggan128-conv1x1' or model_name=='biggan128-Group2Conv1x1':
+    elif model_name=='biggan128-conv1x1':
         params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
         params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
@@ -97,34 +92,14 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
         # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
         params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
-    elif model_name=='biggan128-conv1x1-2-2':
+    elif model_name=='biggan128-conv1x1-3':
         # params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
-        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
+        # params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
-        params.append({"params":list(model.embeddings_params().values()), "lr": 0.01 })
+        params.append({"params":list(model.embeddings_params().values()), "lr": 0.1 })
         # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
         params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
-        params.append({"params":list(model.conv1x1_first_paramG_weight_params().values()), "lr": lr_bsa_linear })
-        params.append({"params":list(model.conv1x1_first_paramG_bias_params().values()), "lr": lr_bsa_linear })
-    elif model_name=='biggan128-ResConv1x1':
-        params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
-        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
-        # params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear })
-        params.append({"params":list(model.emebeddings_params().values()), "lr": lr_embed })
-        params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
-    elif model_name=='biggan128-Res2Conv1x1':
-        params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
-        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
-        # params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear })
-        params.append({"params":list(model.emebeddings_params().values()), "lr": lr_embed })
-        params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
-    elif model_name=='biggan128-depthwise':
-        params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
-        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
-        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
-        params.append({"params":list(model.embeddings_params().values()), "lr": 0.01 })
-        # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
 
     #setup optimizer
     optimizer = optim.Adam(params, lr=0)#0 is okay because sepcific lr is set by `params`
@@ -151,8 +126,10 @@ def main(args):
         model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained)
     elif args.model == "biggan128-conv1x1":
         model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained)
-    elif 'biggan128-conv1x1-2' in args.model:
+    elif args.model == 'biggan128-conv1x1-2':
         model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained,groups=args.groups)
+    elif args.model == 'biggan128-conv1x1-3':
+        model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained,per_groups=args.per_groups)
     else:
         print('Error: Model not defined')
         sys.exit(1)
