@@ -2,12 +2,13 @@ import torch
 import torchvision
 import torch.nn as nn
 
-from . import BigGAN as biggan
-from .AdaBIGGAN import AdaBIGGAN
-# from .AdaBIGGAN_conv1x1 import AdaBIGGAN as AdaBIGGAN_conv1x1
-# from .AdaBIGGAN_MixConv1x1 import AdaBIGGAN as AdaBIGGAN_MixConv1x1
-# from .AdaBIGGAN_ResConv1x1 import AdaBIGGAN as AdaBIGGAN_ResConv1x1
-# from .AdaBIGGAN_Res2Conv1x1 import AdaBIGGAN as AdaBIGGAN_Res2Conv1x1
+from .original import BigGAN as biggan_original
+from .conv1x1 import BigGAN as biggan_conv1x1
+from .conv1x1_2 import BigGAN as biggan_conv1x1_2
+
+from .original.AdaBIGGAN import AdaBIGGAN
+from .conv1x1.AdaBIGGAN_conv1x1 import AdaBIGGAN as AdaBIGGAN_conv1x1
+from .conv1x1_2.AdaBIGGAN_conv1x1 import AdaBIGGAN as AdaBIGGAN_conv1x1_2
 
 # taken from https://github.com/ajbrock/BigGAN-PyTorch/issues/8
 bigagn128config = {'dataset': 'I128_hdf5',
@@ -119,25 +120,17 @@ bigagn128config = {'dataset': 'I128_hdf5',
 def setup_model(name,dataset_size,resume=None,biggan_imagenet_pretrained_model_path="./data/G_ema.pth"):
     print("model name:",name)
     if name=="biggan128-ada":
-        G = biggan.Generator(**bigagn128config)
+        G = biggan_original.Generator(**bigagn128config)
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
         model = AdaBIGGAN(G,dataset_size=dataset_size)
-    elif name == "biggan128-MixConv1x1":
-        G = biggan.Generator(**bigagn128config)
-        G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
-        model = AdaBIGGAN_MixConv1x1(G,dataset_size=dataset_size)
-    elif name == "biggan128-ResConv1x1":
-        G = biggan.Generator(**bigagn128config)
-        G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
-        model = AdaBIGGAN_ResConv1x1(G,dataset_size=dataset_size)
-    elif name == "biggan128-Res2Conv1x1":
-        G = biggan.Generator(**bigagn128config)
-        G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
-        model = AdaBIGGAN_Res2Conv1x1(G,dataset_size=dataset_size)
     elif "biggan128-conv1x1" in name:
-        G = biggan.Generator(**bigagn128config)
+        G = biggan_conv1x1.Generator(**bigagn128config)
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
         model = AdaBIGGAN_conv1x1(G,dataset_size=dataset_size)
+    elif "biggan128-conv1x1-2" in name:
+        G = biggan_conv1x1_2.Generator(**bigagn128config)
+        G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
+        model = AdaBIGGAN_conv1x1_2(bigagn128config,G,dataset_size=dataset_size,groups=groups)
     else:
         print("%s (model name) is not defined"%name)
         raise NotImplementedError()

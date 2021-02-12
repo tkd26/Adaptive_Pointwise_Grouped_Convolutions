@@ -4,3 +4,6 @@ experiments
 outputs
 official_biggan_pytorch
 *.txt
+command.md
+*.yml
+*.pyc

@@ -56,13 +56,13 @@ class AdaBIGGAN(nn.Module):
         #`y` is equivalent to `c` in chainer smallgan repo
 
         y = torch.ones((z.shape[0], 1),dtype=torch.float32,device=z.device)#z.shape[0] is batch size
-        y = self.linear(y)
+        y = self.linear(y) # y: (batch_size, shared_embed_dim)
 
         # If hierarchical (i.e. use different z per layer), concatenate zs and ys
         if self.generator.hier:
-            zs = torch.split(z, self.generator.z_chunk_size, 1)
-            z = zs[0]
-            ys = [torch.cat([y, item], 1) for item in zs[1:]]
+            zs = torch.split(z, self.generator.z_chunk_size, 1) # 1(zに使うやつ)とhierarchical用にsplit
+            z = zs[0] # generatorにinputとして与える
+            ys = [torch.cat([y, item], 1) for item in zs[1:]] # ys: (batch_size, )
         else:
             raise NotImplementedError("I don't implement this case")
             ys = [y] * len(self.generator.blocks)

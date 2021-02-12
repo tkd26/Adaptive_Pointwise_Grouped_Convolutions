@@ -2,6 +2,8 @@ import os
 import argparse
 import time
 
+from scipy.stats import truncnorm
+
 import torch
 import torchvision
 import torch.optim as optim
@@ -12,16 +14,21 @@ from utils import gpu_setup,savedir_setup,save_args,save_json,check_githash,save
 import visualizers
 from metrics.AverageMeter import AverageMeter
 from dataloaders.setup_dataloader_smallgan import setup_dataloader
-from models.setup_model import setup_model
-from models_conv1x1.setup_model import setup_model as setup_model_conv1x1
+# from models.setup_model import setup_model
+# from models_conv1x1.setup_model import setup_model as setup_model_conv1x1
+# from models_conv1x1_2.setup_model import setup_model as setup_model_conv1x1_2
+# from models_depthwise.setup_model import setup_model as setup_model_depthwise
+from models import setup_model
 from loss.AdaBIGGANLoss import AdaBIGGANLoss
+from loss.KMMD import KMMD
 
 def argparse_setup():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default="anime", help = "dataset. anime or face or flower. ")
     parser.add_argument('--pretrained', type=str, default="./data/G_ema.pth", help = "pretrained BigGAN model")
     parser.add_argument('--mode', type=str, default="train", help = "mode")
-
+    parser.add_argument('--KMMD', action='store_true')
+    parser.add_argument('--FID', action='store_true')
 
     parser.add_argument('--eval-freq', type=int, default=500, help = "save frequency in iteration. currently no eval is implemented and just model saving and sample generation is performed" )
     parser.add_argument('--gpu', '-g', type=str, default='-1')
@@ -32,7 +39,6 @@ def argparse_setup():
     parser.add_argument('--lr-embed', type=float, default=0.05, help = "lr for image embeddings")
     parser.add_argument('--lr-bsa-l', type=float, default=0.0005, help = "lr for statistic (scale and bias) parameter for the original fc layer in generator. This is newly intoroduced learnable parameter for the pretrained GAN")
     parser.add_argument('--lr-c-embed', type=float, default=0.001, help = "lr for class conditional embeddings")
-    
     
     #loss settings
     parser.add_argument('--loss-per', type=float, default=0.1, help = "scaling factor for perceptural loss. ")
@@ -50,6 +56,7 @@ def argparse_setup():
     parser.add_argument('--batch', type=int, default=25, help="batch size")
     parser.add_argument('--workers', type=int, default=4, help="number of processes to make batch worker. default is 8")
     parser.add_argument('--model', type=str,default = "biggan128-ada", help = "model. biggan128-ada")
+    parser.add_argument('--groups', type=int, default=1, help="")
 
     parser.add_argument('--resume', type=str, default=None, help="model weights to resume")
     parser.add_argument('--savedir',  default = "train", help='Output directory')
@@ -63,7 +70,7 @@ def argparse_setup():
 def generate_samples(model,img_prefix,batch_size):
     visualizers.reconstruct(model,img_prefix+"reconstruct.jpg",torch.arange(batch_size),True)
     visualizers.interpolate(model,img_prefix+"interpolate.jpg",source=0,dist=1,trncate=0.3, num=7)
-    visualizers.random(model,img_prefix+"random.jpg",tmp=0.3, n=100, truncate=True)
+    visualizers.random(model,img_prefix+"random.jpg",tmp=0.3, n=9, truncate=True)
 
 def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,lr_embed,lr_class_cond_embed,step,step_facter=0.1):
     #group parameters by lr
@@ -74,18 +81,36 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
         params.append({"params":list(model.bsa_linear_params().values()), "lr":lr_bsa_linear })
         params.append({"params":list(model.emebeddings_params().values()), "lr": lr_embed })
         params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
-    elif model_name=='biggan128-conv1x1':
+    elif model_name=='biggan128-GroupICConv1x1':
+        params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
+        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
+        params.append({"params":list(model.embeddings_params().values()), "lr": lr_embed })
+        # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
+    elif model_name=='biggan128-conv1x1' or model_name=='biggan128-Group2Conv1x1':
         params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
         params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
         params.append({"params":list(model.embeddings_params().values()), "lr": 0.01 })
         # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
     elif model_name=='biggan128-conv1x1-2':
-        params.append({"params":list(model.conv1x1_params().values()), "lr": 0.0001*0.1 })
-        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear*0.1})
-        # params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear })
-        # params.append({"params":list(model.emebeddings_params().values()), "lr": lr_embed })
+        # params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
+        # params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
+        params.append({"params":list(model.embeddings_params().values()), "lr": 0.1 })
         # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
+        params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
+    elif model_name=='biggan128-conv1x1-2-2':
+        # params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
+        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
+        params.append({"params":list(model.embeddings_params().values()), "lr": 0.01 })
+        # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
+        params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.conv1x1_first_paramG_weight_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.conv1x1_first_paramG_bias_params().values()), "lr": lr_bsa_linear })
     elif model_name=='biggan128-ResConv1x1':
         params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
         params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
@@ -98,6 +123,12 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
         # params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear })
         params.append({"params":list(model.emebeddings_params().values()), "lr": lr_embed })
         params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
+    elif model_name=='biggan128-depthwise':
+        params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
+        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
+        params.append({"params":list(model.embeddings_params().values()), "lr": 0.01 })
+        # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
 
     #setup optimizer
     optimizer = optim.Adam(params, lr=0)#0 is okay because sepcific lr is set by `params`
@@ -107,8 +138,8 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
 def main(args):
     device = gpu_setup(args.gpu)
     append_args = ["dataset","model"]
-    checkpoint_dir = savedir_setup(args.savedir,args=args,append_args=append_args,basedir=args.saveroot)
     if args.mode == 'train':
+        checkpoint_dir = savedir_setup(args.savedir,args=args,append_args=append_args,basedir=args.saveroot)
         args.githash = check_githash()
         save_args(checkpoint_dir,args)
     
@@ -122,8 +153,13 @@ def main(args):
     
     if args.model == "biggan128-ada":
         model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained)
+    elif args.model == "biggan128-conv1x1":
+        model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained)
+    elif 'biggan128-conv1x1-2' in args.model:
+        model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained,groups=args.groups)
     else:
-        model = setup_model_conv1x1(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained)
+        print('Error: Model not defined')
+        sys.exit(1)
     model.eval()
     #this has to be eval() even if it's training time
     #because we want to fix batchnorm running mean and var
@@ -151,6 +187,7 @@ def main(args):
     
     #start trainig loop
     losses = AverageMeter()
+    eval_kmmd = AverageMeter()
     print_freq = args.print_freq
     eval_freq = args.eval_freq
     save_freq = eval_freq
@@ -166,58 +203,72 @@ def main(args):
     model = model.to(device)
     criterion = criterion.to(device)
     while(True):
+
+        if args.mode == 'train': scheduler.step()
+
         # Iterate over dataset (one epoch).
         for data in dataloader: 
             img = data[0].to(device)
             indices = data[1].to(device)
         
-            scheduler.step()
-            
             #embeddings (i.e. z) + noise (i.e. epsilon) 
             embeddings = model.embeddings(indices)
             embeddings_eps = torch.randn(embeddings.size(),device=device)*0.01
             #see https://github.com/nogu-atsu/SmallGAN/blob/f604cd17516963d8eec292f3faddd70c227b609a/gen_models/ada_generator.py#L29
             #forward
             img_generated = model(embeddings+embeddings_eps)
-            loss = criterion(img_generated,img,embeddings,model.linear.weight)
-            losses.update(loss.item(), img.size(0))
 
+            if args.mode == 'train':
+                loss = criterion(img_generated,img,embeddings,model.linear.weight)
+                losses.update(loss.item(), img.size(0))
+                #compute gradient and do SGD step
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            elif args.mode == 'eval':
+                if args.KMMD:
+                    # KMMD
+                    latent_size = embeddings.size(1)
+                    true_sample = torch.randn(args.batch, latent_size, requires_grad = False).to(device)
+                    kmmd = KMMD()(true_sample, embeddings)
+                    eval_kmmd.update(kmmd.item(), img.size(0))
+
+            if iteration > max_iteration:
+                break
+            iteration +=1
+                
+        if epoch > max_epoch:
             if args.mode == 'eval':
-                # img_prefix = os.path.join(checkpoint_dir,"%d_"%iteration) 
+                if args.KMMD:
+                    print('KMMD:', eval_kmmd.avg)
+            break
+        epoch+=1
+
+        if args.mode == 'train':
+            if epoch % print_freq == 0:
+                temp = "train loss: %0.5f "%loss.item()
+                temp += "| smoothed loss %0.5f "%losses.avg
+                log["log"].append({"iteration":iteration,"epoch":epoch,"loss":losses.avg})
+                print(epoch,temp)
+                losses = AverageMeter()
+            if epoch % eval_freq==0 and iteration>=0:
+                img_prefix = os.path.join(checkpoint_dir,"%d_"%epoch) 
+                generate_samples(model,img_prefix,dataloader.batch_size)
+                
+            if epoch % save_freq==0 and iteration>0:
+                save_checkpoint(checkpoint_dir,device,model,iteration=epoch )
+
+        elif args.mode == 'eval':
+            if args.FID:
                 out_path = "./outputs/" + args.resume.split('/')[2] + '/'
                 if not os.path.exists(out_path):
                     os.mkdir(out_path)
                 # out_path = "./outputs/"
-                for i in range(10):
-                    visualizers.random_eval(model,out_path,tmp=0.3, n=100, truncate=True, roop_n=i)
-                return 0
+                for i in range(1000):
+                    visualizers.random_eval(model,out_path,tmp=0.3, n=1, truncate=True, roop_n=i)
+                return 
 
-            #compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            
-            if iteration % print_freq == 0:
-                temp = "train loss: %0.5f "%loss.item()
-                temp += "| smoothed loss %0.5f "%losses.avg
-                log["log"].append({"iteration":iteration,"epoch":epoch,"loss":losses.avg})
-                print(iteration,temp)
-                losses = AverageMeter()
-                
-            if iteration%eval_freq==0 and iteration>=0:
-                img_prefix = os.path.join(checkpoint_dir,"%d_"%iteration) 
-                generate_samples(model,img_prefix,dataloader.batch_size)
-                
-            if iteration%save_freq==0 and iteration>0:
-                save_checkpoint(checkpoint_dir,device,model,iteration=iteration )
-                
-            if iteration > max_iteration:
-                break
-            iteration +=1
-            
-        if epoch > max_epoch:
-            break
-        epoch+=1
     
     log_save_path = os.path.join(checkpoint_dir,"train-log.json")
     save_json(log,log_save_path)
