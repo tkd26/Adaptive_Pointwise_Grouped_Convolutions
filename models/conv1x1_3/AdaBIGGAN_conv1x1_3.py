@@ -1,6 +1,5 @@
 #this class is trying to do the same thig as the author's implementation
 # https://github.com/nogu-atsu/SmallGAN/blob/2293700dce1e2cd97e25148543532814659516bd/gen_models/ada_generator.py#L242-L294 
-
 import torch
 import torchvision
 import torch.nn as nn
@@ -39,8 +38,9 @@ class AdaBIGGAN(nn.Module):
             conv1x1_first_paramG_weight：最初のconv1x1の重みを生成するFC層のリスト
             conv1x1_first_paramG_bias：最初のconv1x1のバイアスを生成するFC層のリスト
         '''
-        # in_size = 148
-        in_size = 20
+        in_size = 148
+        # in_size = 20
+        # in_size = 100
         self.conv1x1_paramG_weights = []
         self.conv1x1_paramG_biases = []
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
@@ -110,13 +110,19 @@ class AdaBIGGAN(nn.Module):
         # If hierarchical (i.e. use different z per layer), concatenate zs and ys
         if self.generator.hier:
             zs = torch.split(z, self.generator.z_chunk_size, 1) # 6つに分割(1つあたり20)
+            z_origin = z
             z = zs[0] # batch * 20
-            # ys = [torch.cat([y, item], 1) for item in zs[1:]] # リスト一つの要素サイズはbatch * (128+20)
-            ys = zs[1:]
+            ys = [torch.cat([y, item], 1) for item in zs[1:]] # リスト一つの要素サイズはbatch * (128+20)
+            # ys = zs[1:]
+            # ys = [z_origin]*5
+
+            # ys = zs[1]
+            # for i in zs[2:]:
+            #     ys = torch.cat((ys,i),1)
+            # ys = [ys]*5
         else:
             # raise NotImplementedError("I don't implement this case")
-            # ys = [y] * len(self.generator.blocks)
-            ys = [z]*5
+            ys = [y] * len(self.generator.blocks)
 
         '''
         -- 最初の1x1conv --

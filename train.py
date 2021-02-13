@@ -96,8 +96,8 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
         # params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
         # params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
-        params.append({"params":list(model.embeddings_params().values()), "lr": 0.1 })
-        # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
+        params.append({"params":list(model.embeddings_params().values()), "lr": lr_embed })
+        params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
         params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
 
