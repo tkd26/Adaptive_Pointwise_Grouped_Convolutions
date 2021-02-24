@@ -39,8 +39,6 @@ class AdaBIGGAN(nn.Module):
             conv1x1_first_paramG_bias：最初のconv1x1のバイアスを生成するFC層のリスト
         '''
         in_size = 148
-        # in_size = 20
-        # in_size = 100
         self.conv1x1_paramG_weights = []
         self.conv1x1_paramG_biases = []
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
@@ -113,6 +111,7 @@ class AdaBIGGAN(nn.Module):
             z_origin = z
             z = zs[0] # batch * 20
             ys = [torch.cat([y, item], 1) for item in zs[1:]] # リスト一つの要素サイズはbatch * (128+20)
+
             # ys = zs[1:]
             # ys = [z_origin]*5
 
@@ -120,6 +119,11 @@ class AdaBIGGAN(nn.Module):
             # for i in zs[2:]:
             #     ys = torch.cat((ys,i),1)
             # ys = [ys]*5
+
+            # ys = [z]*5
+            
+            # ys = [y] * 5
+
         else:
             # raise NotImplementedError("I don't implement this case")
             ys = [y] * len(self.generator.blocks)

@@ -47,10 +47,10 @@ def argparse_setup():
     parser.add_argument('--step', type=int, default=3000, help="Decrease lr by a factor of args.step_facter every <step> iterations")
     parser.add_argument('--step-facter', type=float, default=0.1, help="facter to multipy when decrease lr ")
 
-    parser.add_argument('--iters', type=int, default=10000, help="number of iterations.")
     parser.add_argument('--epoch', type=int, default=30000, help="number of epochs.")
     parser.add_argument('--batch', type=int, default=25, help="batch size")
     parser.add_argument('--workers', type=int, default=4, help="number of processes to make batch worker. default is 8")
+    parser.add_argument('--data_num', type=int, default=50, help="")
     parser.add_argument('--model', type=str,default = "biggan128-ada", help = "model. biggan128-ada")
     parser.add_argument('--groups', type=int, default=1, help="")
     parser.add_argument('--per_groups', type=int, default=0, help="ch/per_groups")
@@ -96,7 +96,7 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
         # params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
         # params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
-        params.append({"params":list(model.embeddings_params().values()), "lr": lr_embed })
+        params.append({"params":list(model.embeddings_params().values()), "lr": 0.1 })
         params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
         params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
@@ -108,7 +108,7 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
 
 def main(args):
     device = gpu_setup(args.gpu)
-    append_args = ["dataset","model"]
+    append_args = ["dataset","data_num","model"]
     if args.mode == 'train':
         checkpoint_dir = savedir_setup(args.savedir,args=args,append_args=append_args,basedir=args.saveroot)
         args.githash = check_githash()
@@ -117,6 +117,7 @@ def main(args):
     dataloader = setup_dataloader(name=args.dataset,
                                    batch_size=args.batch,
                                    num_workers=args.workers,
+                                   data_num=args.data_num,
                                   )
     
     dataset_size = len(dataloader.dataset)
@@ -164,13 +165,11 @@ def main(args):
     print_freq = args.print_freq
     eval_freq = args.eval_freq
     save_freq = eval_freq
-    max_iteration = args.iters
     max_epoch = args.epoch
     log = {}
     log["log"]=[]
     since = time.time()
     
-    iteration = 0
     epoch = 0
     #prepare model and loss into device
     model = model.to(device)
@@ -195,9 +194,6 @@ def main(args):
                 loss = criterion(img_generated,img,embeddings,model.linear.weight)
                 losses.update(loss.item(), img.size(0))
                 #compute gradient and do SGD step
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
 
             elif args.mode == 'eval':
                 if args.KMMD:
@@ -206,30 +202,30 @@ def main(args):
                     true_sample = torch.randn(args.batch, latent_size, requires_grad = False).to(device)
                     kmmd = KMMD()(true_sample, embeddings)
                     eval_kmmd.update(kmmd.item(), img.size(0))
-
-            if iteration > max_iteration:
-                break
-            iteration +=1
                 
         if epoch > max_epoch:
-            if args.mode == 'eval':
-                if args.KMMD:
-                    print('KMMD:', eval_kmmd.avg)
+            if args.mode == 'eval' and args.KMMD:
+                print('KMMD:', eval_kmmd.avg)
             break
+        
         epoch+=1
 
         if args.mode == 'train':
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
             if epoch % print_freq == 0:
                 temp = "train loss: %0.5f "%loss.item()
                 temp += "| smoothed loss %0.5f "%losses.avg
-                log["log"].append({"iteration":iteration,"epoch":epoch,"loss":losses.avg})
+                log["log"].append({"epoch":epoch,"loss":losses.avg})
                 print(epoch,temp)
                 losses = AverageMeter()
-            if epoch % eval_freq==0 and iteration>=0:
+            if epoch % eval_freq==0:
                 img_prefix = os.path.join(checkpoint_dir,"%d_"%epoch) 
                 generate_samples(model,img_prefix,dataloader.batch_size)
                 
-            if epoch % save_freq==0 and iteration>0:
+            if epoch % save_freq==0:
                 save_checkpoint(checkpoint_dir,device,model,iteration=epoch )
 
         elif args.mode == 'eval':
@@ -237,14 +233,14 @@ def main(args):
                 out_path = "./outputs/" + args.resume.split('/')[2] + '/'
                 if not os.path.exists(out_path):
                     os.mkdir(out_path)
-                # out_path = "./outputs/"
-                for i in range(1000):
-                    visualizers.random_eval(model,out_path,tmp=0.3, n=1, truncate=True, roop_n=i)
-                return 
+                    for i in range(1000):
+                        visualizers.random_eval(model,out_path,tmp=0.3, n=1, truncate=True, roop_n=i)
+                    # return 
 
     
-    log_save_path = os.path.join(checkpoint_dir,"train-log.json")
-    save_json(log,log_save_path)
+    if args.mode == 'train':
+        log_save_path = os.path.join(checkpoint_dir,"train-log.json")
+        save_json(log,log_save_path)
 
 if __name__ == '__main__':
     args = argparse_setup()

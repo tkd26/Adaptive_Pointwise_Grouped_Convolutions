@@ -3,14 +3,16 @@ from .ImageListDataset import ImageListDataset
 from torchvision import transforms
 from torch.utils.data import  DataLoader
 
-def setup_dataloader(name,h=128,w=128,batch_size=4,num_workers=4):
+def setup_dataloader(name,h=128,w=128,batch_size=4,num_workers=4,data_num=50):
     '''
     instead of setting up dataloader that read raw image from file, 
     let's use store all images on cpu memmory
     because this is for small dataset
     '''
     if name == "face":
-        img_path_list = glob.glob("./data/face/*.png")
+        # img_path_list = glob.glob("./data/face/*.png")
+        img_path_list = glob.glob("/home/yanai-lab/takeda-m/space/dataset/FFHQ/all/*.png")
+        img_path_list = sorted(img_path_list)[:data_num]
     elif name=="anime":
         img_path_list = glob.glob("./data/anime/*.png")
     elif name=="flower":
