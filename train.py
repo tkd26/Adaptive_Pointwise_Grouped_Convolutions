@@ -62,8 +62,6 @@ def argparse_setup():
     parser.add_argument('-p', '--print-freq', default=100, type=int, help='print frequency ')
     return parser.parse_args()
 
-
-
 def generate_samples(model,img_prefix,batch_size):
     visualizers.reconstruct(model,img_prefix+"reconstruct.jpg",torch.arange(batch_size),True)
     visualizers.interpolate(model,img_prefix+"interpolate.jpg",source=0,dist=1,trncate=0.3, num=7)
@@ -93,13 +91,13 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
         params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
     elif model_name=='biggan128-conv1x1-3':
-        # params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
-        # params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
         params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
-        params.append({"params":list(model.embeddings_params().values()), "lr": 0.1 })
+        params.append({"params":list(model.embeddings_params().values()), "lr": lr_embed })
         params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
-        params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
-        params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_g_batch_stat })
+        params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_g_batch_stat })
+        params.append({"params":list(model.conv1x1_first_paramG_weight_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.conv1x1_first_paramG_bias_params().values()), "lr": lr_bsa_linear })
 
     #setup optimizer
     optimizer = optim.Adam(params, lr=0)#0 is okay because sepcific lr is set by `params`
@@ -194,6 +192,9 @@ def main(args):
                 loss = criterion(img_generated,img,embeddings,model.linear.weight)
                 losses.update(loss.item(), img.size(0))
                 #compute gradient and do SGD step
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
             elif args.mode == 'eval':
                 if args.KMMD:
@@ -211,9 +212,6 @@ def main(args):
         epoch+=1
 
         if args.mode == 'train':
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
             
             if epoch % print_freq == 0:
                 temp = "train loss: %0.5f "%loss.item()
