@@ -286,7 +286,7 @@ class ccbn(nn.Module):
     self.bias = which_linear(input_size, output_size)
     # epsilon to avoid dividing by 0
     self.eps = eps
-    # Momentumƒ
+    # Momentum
     self.momentum = momentum
     # Use cross-replica batchnorm?
     self.cross_replica = cross_replica

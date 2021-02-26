@@ -393,8 +393,8 @@ class GBlock(nn.Module):
       self.conv_sc = self.which_conv(in_channels, out_channels, 
                                      kernel_size=1, padding=0)
     # Batchnorm layers
-    self.bn1 = self.which_bn(in_channels)
-    self.bn2 = self.which_bn(out_channels)
+    self.bn1 = self.which_bn(output_size=in_channels)
+    self.bn2 = self.which_bn(output_size=out_channels)
     # upsample layers
     self.upsample = upsample
 

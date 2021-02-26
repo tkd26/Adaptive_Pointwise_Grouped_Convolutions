@@ -96,8 +96,9 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
         params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
         params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_g_batch_stat })
         params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_g_batch_stat })
-        params.append({"params":list(model.conv1x1_first_paramG_weight_params().values()), "lr": lr_bsa_linear })
-        params.append({"params":list(model.conv1x1_first_paramG_bias_params().values()), "lr": lr_bsa_linear })
+        # params.append({"params":list(model.conv1x1_first_paramG_weight_params().values()), "lr": lr_bsa_linear })
+        # params.append({"params":list(model.conv1x1_first_paramG_bias_params().values()), "lr": lr_bsa_linear })
+        params.append({"params":list(model.bsa_linear_params().values()), "lr":lr_bsa_linear })
 
     #setup optimizer
     optimizer = optim.Adam(params, lr=0)#0 is okay because sepcific lr is set by `params`

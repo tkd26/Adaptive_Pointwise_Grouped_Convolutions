@@ -17,6 +17,13 @@ class AdaBIGGAN(nn.Module):
         self.embeddings = nn.Embedding(dataset_size, embed_dim)
         if embedding_init == "zero":
             self.embeddings.from_pretrained(torch.zeros(dataset_size,embed_dim),freeze=False)
+
+        '''
+        -- 初期レイヤのスケールとバイアス --
+        '''
+        in_channels = self.generator.blocks[0][0].conv1.in_channels
+        self.bsa_linear_scale = torch.nn.Parameter(torch.ones(in_channels,))
+        self.bsa_linear_bias = torch.nn.Parameter(torch.zeros(in_channels,))
         
         '''
         -- embedding用のzの定義 --
@@ -128,7 +135,7 @@ class AdaBIGGAN(nn.Module):
             # ys = [y] * 5
 
         else:
-            # raise NotImplementedError("I don't implement this case")
+            raise NotImplementedError("I don't implement this case")
             ys = [y] * len(self.generator.blocks)
 
         '''
@@ -139,15 +146,16 @@ class AdaBIGGAN(nn.Module):
         h = self.generator.linear(z)
         # Reshape
         h = h.view(h.size(0), -1, self.generator.bottom_width, self.generator.bottom_width)
+        h = h*self.bsa_linear_scale.view(1,-1,1,1) + self.bsa_linear_bias.view(1,-1,1,1) 
         # h = self.conv1x1_first(h)
 
-        conv1x1_first_weight = self.conv1x1_first_paramG_weight(ys[1]).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
-        conv1x1_first_bias = self.conv1x1_first_paramG_bias(ys[1]).squeeze(0)
-        conv1x1_first_weight = conv1x1_first_weight.repeat(1,1,1,h.shape[2],h.shape[3])
-        conv1x1_first_bias = conv1x1_first_bias.unsqueeze(-1).unsqueeze(-1).repeat(1,1,h.shape[2],h.shape[3])
-        h = h.unsqueeze(2) * conv1x1_first_weight
-        h = torch.sum(h, dim=2).squeeze(2)
-        h += conv1x1_first_bias
+        # conv1x1_first_weight = self.conv1x1_first_paramG_weight(ys[1]).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
+        # conv1x1_first_bias = self.conv1x1_first_paramG_bias(ys[1]).squeeze(0)
+        # conv1x1_first_weight = conv1x1_first_weight.repeat(1,1,1,h.shape[2],h.shape[3])
+        # conv1x1_first_bias = conv1x1_first_bias.unsqueeze(-1).unsqueeze(-1).repeat(1,1,h.shape[2],h.shape[3])
+        # h = h.unsqueeze(2) * conv1x1_first_weight
+        # h = torch.sum(h, dim=2).squeeze(2)
+        # h += conv1x1_first_bias
         
         '''
         -- 2層目以降の処理 --
@@ -158,7 +166,7 @@ class AdaBIGGAN(nn.Module):
             for block_idx, block in enumerate(blocklist):
                 if block_idx==0:
                     # print(i)
-                    conv1x1_1_weight = self.conv1x1_paramG_weights[i](ys[index]).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
+                    conv1x1_1_weight = (self.conv1x1_paramG_weights[i](ys[index]) + 1).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
                     conv1x1_1_bias = self.conv1x1_paramG_biases[i](ys[index]).squeeze(0)
 
                     x = h
@@ -177,7 +185,7 @@ class AdaBIGGAN(nn.Module):
                     h = block.conv1(h)
 
                     # print(i+1)
-                    conv1x1_2_weight = self.conv1x1_paramG_weights[i+1](ys[index]).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
+                    conv1x1_2_weight = (self.conv1x1_paramG_weights[i+1](ys[index]) + 1).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
                     conv1x1_2_bias = self.conv1x1_paramG_biases[i+1](ys[index]).squeeze(0)
 
                     h = block.bn2(h, ys[index])
@@ -217,7 +225,7 @@ class AdaBIGGAN(nn.Module):
         # --最初のlinear層
         named_params_requires_grad.update(self.linear_gen_params()) 
         # --最初のlinear層のパラメータ（1x1convでは使用しない）
-        # named_params_requires_grad.update(self.bsa_linear_params())
+        named_params_requires_grad.update(self.bsa_linear_params())
         # --bnのパラメータ生成に使うベクトルを入れるlinear（1x1convでは使用しない）
         # named_params_requires_grad.update(self.calss_conditional_embeddings_params())
         # --ベクトルをembeddingする（1x1convでは使用しない）
@@ -356,12 +364,12 @@ class AdaBIGGAN(nn.Module):
         return {"generator.linear.weight":self.generator.linear.weight,
                        "generator.linear.bias":self.generator.linear.bias}
 
-    # def bsa_linear_params(self):
-    #     '''
-    #     Statistics parameter (scale and bias) after lienar layer
-    #     This is a newly intoroduced training parameters that did not exist in the original generator
-    #     '''
-    #     return {"bsa_linear_scale":self.bsa_linear_scale,"bsa_linear_bias":self.bsa_linear_bias}
+    def bsa_linear_params(self):
+        '''
+        Statistics parameter (scale and bias) after lienar layer
+        This is a newly intoroduced training parameters that did not exist in the original generator
+        '''
+        return {"bsa_linear_scale":self.bsa_linear_scale,"bsa_linear_bias":self.bsa_linear_bias}
 
     def calss_conditional_embeddings_params(self):
         '''

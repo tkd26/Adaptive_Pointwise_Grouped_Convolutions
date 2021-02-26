@@ -85,7 +85,6 @@ class Generator(nn.Module):
     # Dimensionality of the shared embedding? Unused if not using G_shared
     self.shared_dim = shared_dim if shared_dim > 0 else dim_z
     # Hierarchical latent space?
-    # self.hier = hier
     self.hier = hier
     # Cross replica batchnorm?
     self.cross_replica = cross_replica
