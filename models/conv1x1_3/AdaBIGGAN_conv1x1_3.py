@@ -49,7 +49,7 @@ class AdaBIGGAN(nn.Module):
         self.conv1x1_paramG_weights = []
         self.conv1x1_paramG_biases = []
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
-            if self.per_groups==0: groups = ch
+            if self.per_groups==0: groups = 1
             else: groups = ch //self.per_groups
             self.conv1x1_paramG_weights += [nn.Linear(int(in_size), int(ch*ch/groups))]
             self.conv1x1_paramG_biases += [nn.Linear(int(in_size), int(ch))]
@@ -57,7 +57,7 @@ class AdaBIGGAN(nn.Module):
         self.conv1x1_paramG_biases = nn.ModuleList(self.conv1x1_paramG_biases)
 
         ch_first = self.generator.blocks[0][0].conv1.in_channels
-        if self.per_groups==0: groups = ch_first
+        if self.per_groups==0: groups = 1
         else: groups = ch_first //self.per_groups
         self.conv1x1_first_paramG_weight = nn.Linear(int(in_size), int(ch_first*ch_first/groups))
         self.conv1x1_first_paramG_bias = nn.Linear(int(in_size), int(ch_first))
@@ -81,7 +81,7 @@ class AdaBIGGAN(nn.Module):
         # blockのconv1x1
         self.conv1x1 = []
         for ch in [1536, 1536, 1536, 768, 768, 384, 384, 192, 192, 96]:
-            if self.per_groups==0: groups = ch
+            if self.per_groups==0: groups = 1
             else: groups = ch //self.per_groups
             conv = nn.Conv2d(ch, ch, kernel_size=1, stride=1, padding=0, groups=groups).cuda()
             weight_init = torch.eye(conv.weight.data.shape[0]).unsqueeze(-1).unsqueeze(-1)
@@ -91,7 +91,7 @@ class AdaBIGGAN(nn.Module):
 
         # 最初のレイヤのconv1x1
         in_ch = self.generator.blocks[0][0].conv1.in_channels
-        if self.per_groups==0: groups = in_ch
+        if self.per_groups==0: groups = 1
         else: groups = in_ch //self.per_groups
         self.conv1x1_first = nn.Conv2d(in_ch, in_ch, kernel_size=1, stride=1, padding=0, groups=groups).cuda()
         
@@ -149,7 +149,7 @@ class AdaBIGGAN(nn.Module):
         h = h*self.bsa_linear_scale.view(1,-1,1,1) + self.bsa_linear_bias.view(1,-1,1,1) 
         # h = self.conv1x1_first(h)
 
-        # conv1x1_first_weight = self.conv1x1_first_paramG_weight(ys[1]).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
+        # conv1x1_first_weight = (self.conv1x1_first_paramG_weight(ys[1]) + 1).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
         # conv1x1_first_bias = self.conv1x1_first_paramG_bias(ys[1]).squeeze(0)
         # conv1x1_first_weight = conv1x1_first_weight.repeat(1,1,1,h.shape[2],h.shape[3])
         # conv1x1_first_bias = conv1x1_first_bias.unsqueeze(-1).unsqueeze(-1).repeat(1,1,h.shape[2],h.shape[3])
@@ -166,7 +166,12 @@ class AdaBIGGAN(nn.Module):
             for block_idx, block in enumerate(blocklist):
                 if block_idx==0:
                     # print(i)
-                    conv1x1_1_weight = (self.conv1x1_paramG_weights[i](ys[index]) + 1).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
+                    # groups=chの時はweightに+1する
+                    # conv1x1_1_weight = (self.conv1x1_paramG_weights[i](ys[index]) + 1).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
+                    conv1x1_1_weight = (self.conv1x1_paramG_weights[i](ys[index])).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
+                    weight_init = torch.eye(self.per_groups).unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
+                    weight_init = weight_init.repeat(conv1x1_1_weight.shape[0], conv1x1_1_weight.shape[1]//self.per_groups, 1, 1, 1)
+                    conv1x1_1_weight += weight_init.cuda()
                     conv1x1_1_bias = self.conv1x1_paramG_biases[i](ys[index]).squeeze(0)
 
                     x = h
@@ -185,7 +190,11 @@ class AdaBIGGAN(nn.Module):
                     h = block.conv1(h)
 
                     # print(i+1)
-                    conv1x1_2_weight = (self.conv1x1_paramG_weights[i+1](ys[index]) + 1).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
+                    # conv1x1_2_weight = (self.conv1x1_paramG_weights[i+1](ys[index]) + 1).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
+                    conv1x1_2_weight = (self.conv1x1_paramG_weights[i+1](ys[index])).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
+                    weight_init = torch.eye(self.per_groups).unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
+                    weight_init = weight_init.repeat(conv1x1_2_weight.shape[0], conv1x1_2_weight.shape[1]//self.per_groups, 1, 1, 1)
+                    conv1x1_2_weight += weight_init.cuda()
                     conv1x1_2_bias = self.conv1x1_paramG_biases[i+1](ys[index]).squeeze(0)
 
                     h = block.bn2(h, ys[index])
@@ -227,7 +236,7 @@ class AdaBIGGAN(nn.Module):
         # --最初のlinear層のパラメータ（1x1convでは使用しない）
         named_params_requires_grad.update(self.bsa_linear_params())
         # --bnのパラメータ生成に使うベクトルを入れるlinear（1x1convでは使用しない）
-        # named_params_requires_grad.update(self.calss_conditional_embeddings_params())
+        named_params_requires_grad.update(self.calss_conditional_embeddings_params())
         # --ベクトルをembeddingする（1x1convでは使用しない）
         named_params_requires_grad.update(self.embeddings_params())
 
