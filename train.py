@@ -1,6 +1,8 @@
 import os
 import argparse
 import time
+import numpy as np
+import random
 
 from scipy.stats import truncnorm
 
@@ -17,6 +19,15 @@ from dataloaders.setup_dataloader_smallgan import setup_dataloader
 from models.setup_model import setup_model
 from loss.AdaBIGGANLoss import AdaBIGGANLoss
 from loss.KMMD import KMMD
+
+SEED = 1
+def define_seed(seed):
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    global SEED
+    SEED += 1
 
 def argparse_setup():
     parser = argparse.ArgumentParser()
@@ -179,6 +190,7 @@ def main(args):
 
         # Iterate over dataset (one epoch).
         for data in dataloader: 
+            define_seed(SEED)
             img = data[0].to(device)
             indices = data[1].to(device)
         
@@ -193,9 +205,9 @@ def main(args):
                 loss = criterion(img_generated,img,embeddings,model.linear.weight)
                 losses.update(loss.item(), img.size(0))
                 #compute gradient and do SGD step
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+                # optimizer.zero_grad()
+                # loss.backward()
+                # optimizer.step()
 
             elif args.mode == 'eval':
                 if args.KMMD:
@@ -206,13 +218,13 @@ def main(args):
                     eval_kmmd.update(kmmd.item(), img.size(0))
                 
         if epoch > max_epoch:
-            if args.mode == 'eval' and args.KMMD:
-                print('KMMD:', eval_kmmd.avg)
             break
-        
         epoch+=1
 
         if args.mode == 'train':
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
             
             if epoch % print_freq == 0:
                 temp = "train loss: %0.5f "%loss.item()
@@ -228,13 +240,15 @@ def main(args):
                 save_checkpoint(checkpoint_dir,device,model,iteration=epoch )
 
         elif args.mode == 'eval':
-            if args.FID:
-                out_path = "./outputs/" + args.resume.split('/')[2] + '/'
-                if not os.path.exists(out_path):
+            if (epoch - 1) * args.data_num > 10000: # eval用のデータ数は10,000
+                if args.KMMD:
+                    print('KMMD:', eval_kmmd.avg)
+                if args.FID:
+                    out_path = "./outputs/" + args.resume.split('/')[2] + '/'
                     os.mkdir(out_path)
                     for i in range(1000):
                         visualizers.random_eval(model,out_path,tmp=0.3, n=1, truncate=True, roop_n=i)
-                    # return 
+                break
 
     
     if args.mode == 'train':

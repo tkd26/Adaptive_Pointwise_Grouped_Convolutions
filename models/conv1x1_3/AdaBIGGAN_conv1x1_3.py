@@ -169,8 +169,12 @@ class AdaBIGGAN(nn.Module):
                     # groups=chの時はweightに+1する
                     # conv1x1_1_weight = (self.conv1x1_paramG_weights[i](ys[index]) + 1).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
                     conv1x1_1_weight = (self.conv1x1_paramG_weights[i](ys[index])).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
-                    weight_init = torch.eye(self.per_groups).unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
-                    weight_init = weight_init.repeat(conv1x1_1_weight.shape[0], conv1x1_1_weight.shape[1]//self.per_groups, 1, 1, 1)
+                    if self.per_groups != 0:
+                        weight_init = torch.eye(self.per_groups).unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
+                        weight_init = weight_init.repeat(conv1x1_1_weight.shape[0], conv1x1_1_weight.shape[1]//self.per_groups, 1, 1, 1)
+                    else:
+                        weight_init = torch.eye(conv1x1_1_weight.shape[1]).unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
+                        weight_init = weight_init.repeat(conv1x1_1_weight.shape[0], conv1x1_1_weight.shape[1], 1, 1, 1)
                     conv1x1_1_weight += weight_init.cuda()
                     conv1x1_1_bias = self.conv1x1_paramG_biases[i](ys[index]).squeeze(0)
 
@@ -192,8 +196,12 @@ class AdaBIGGAN(nn.Module):
                     # print(i+1)
                     # conv1x1_2_weight = (self.conv1x1_paramG_weights[i+1](ys[index]) + 1).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
                     conv1x1_2_weight = (self.conv1x1_paramG_weights[i+1](ys[index])).view(h.shape[0],h.shape[1],-1).unsqueeze(-1).unsqueeze(-1)
-                    weight_init = torch.eye(self.per_groups).unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
-                    weight_init = weight_init.repeat(conv1x1_2_weight.shape[0], conv1x1_2_weight.shape[1]//self.per_groups, 1, 1, 1)
+                    if self.per_groups != 0:
+                        weight_init = torch.eye(self.per_groups).unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
+                        weight_init = weight_init.repeat(conv1x1_2_weight.shape[0], conv1x1_2_weight.shape[1]//self.per_groups, 1, 1, 1)
+                    else:
+                        weight_init = torch.eye(conv1x1_2_weight.shape[1]).unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
+                        weight_init = weight_init.repeat(conv1x1_2_weight.shape[0], conv1x1_2_weight.shape[1], 1, 1, 1)
                     conv1x1_2_weight += weight_init.cuda()
                     conv1x1_2_bias = self.conv1x1_paramG_biases[i+1](ys[index]).squeeze(0)
 
