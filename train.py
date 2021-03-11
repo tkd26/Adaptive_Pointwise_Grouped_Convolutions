@@ -179,6 +179,11 @@ def main(args):
     log = {}
     log["log"]=[]
     since = time.time()
+
+    min_loss = {
+        'data': 1000, # 適当な大きい数字
+        'epoch': 0,
+    }
     
     epoch = 0
     #prepare model and loss into device
@@ -205,9 +210,9 @@ def main(args):
                 loss = criterion(img_generated,img,embeddings,model.linear.weight)
                 losses.update(loss.item(), img.size(0))
                 #compute gradient and do SGD step
-                # optimizer.zero_grad()
-                # loss.backward()
-                # optimizer.step()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
             elif args.mode == 'eval':
                 if args.KMMD:
@@ -216,19 +221,19 @@ def main(args):
                     true_sample = torch.randn(args.batch, latent_size, requires_grad = False).to(device)
                     kmmd = KMMD()(true_sample, embeddings)
                     eval_kmmd.update(kmmd.item(), img.size(0))
-                
-        if epoch > max_epoch:
-            break
-        epoch+=1
 
         if args.mode == 'train':
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            # optimizer.zero_grad()
+            # loss.backward()
+            # optimizer.step()
             
             if epoch % print_freq == 0:
+                if min_loss['data'] > losses.avg:
+                    min_loss['data'] = losses.avg
+                    min_loss['epoch'] = epoch
                 temp = "train loss: %0.5f "%loss.item()
                 temp += "| smoothed loss %0.5f "%losses.avg
+                temp += "| min loss %0.5f (%d)"%(min_loss['data'], min_loss['epoch'])
                 log["log"].append({"epoch":epoch,"loss":losses.avg})
                 print(epoch,temp)
                 losses = AverageMeter()
@@ -249,6 +254,10 @@ def main(args):
                     for i in range(1000):
                         visualizers.random_eval(model,out_path,tmp=0.3, n=1, truncate=True, roop_n=i)
                 break
+
+        if epoch > max_epoch:
+            break
+        epoch+=1
 
     
     if args.mode == 'train':
