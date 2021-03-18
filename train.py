@@ -62,7 +62,7 @@ def argparse_setup():
     parser.add_argument('--batch', type=int, default=25, help="batch size")
     parser.add_argument('--workers', type=int, default=4, help="number of processes to make batch worker. default is 8")
     parser.add_argument('--data_num', type=int, default=50, help="")
-    parser.add_argument('--model', type=str,default = "biggan128-ada", help = "model. biggan128-ada")
+    parser.add_argument('--model', type=str,default = "biggan128-ada", help = "model. biggan128-ada or biggan128-conv1x1-3")
     parser.add_argument('--groups', type=int, default=1, help="")
     parser.add_argument('--per_groups', type=int, default=0, help="ch/per_groups")
 
@@ -81,27 +81,30 @@ def generate_samples(model,img_prefix,batch_size):
 def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,lr_embed,lr_class_cond_embed,step,step_facter=0.1):
     #group parameters by lr
     params = []
-    if model_name=='biggan128-ada':
+    if model_name=='biggan128-ada': # FiLM
         params.append({"params":list(model.batch_stat_gen_params().values()), "lr":lr_g_batch_stat})
         params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear })
         params.append({"params":list(model.bsa_linear_params().values()), "lr":lr_bsa_linear })
         params.append({"params":list(model.emebeddings_params().values()), "lr": lr_embed })
         params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
-    elif model_name=='biggan128-conv1x1':
-        params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
-        params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
-        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
-        params.append({"params":list(model.embeddings_params().values()), "lr": 0.01 })
-        # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
-    elif model_name=='biggan128-conv1x1-2':
-        # params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
-        # params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
-        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
-        params.append({"params":list(model.embeddings_params().values()), "lr": 0.1 })
-        # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
-        params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
-        params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
-    elif model_name=='biggan128-conv1x1-3':
+
+    # elif model_name=='biggan128-conv1x1': # 旧モデル
+    #     params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
+    #     params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
+    #     params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
+    #     params.append({"params":list(model.embeddings_params().values()), "lr": 0.01 })
+    #     # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
+
+    # elif model_name=='biggan128-conv1x1-2': # 旧モデル
+    #     # params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
+    #     # params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
+    #     params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
+    #     params.append({"params":list(model.embeddings_params().values()), "lr": 0.1 })
+    #     # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
+    #     params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
+    #     params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
+
+    elif model_name=='biggan128-conv1x1-3': # メインで使用しているモデル
         params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
         params.append({"params":list(model.embeddings_params().values()), "lr": lr_embed })
         params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})

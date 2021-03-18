@@ -140,7 +140,6 @@ class AdaBIGGAN(nn.Module):
 
         '''
         -- 最初の1x1conv --
-        * 現在は不使用
         '''
         # First linear layer
         h = self.generator.linear(z)
@@ -241,16 +240,12 @@ class AdaBIGGAN(nn.Module):
         # named_params_requires_grad.update(self.batch_stat_gen_params()) 
         # --最初のlinear層
         named_params_requires_grad.update(self.linear_gen_params()) 
-        # --最初のlinear層のパラメータ（1x1convでは使用しない）
+        # --最初のlinear層のパラメータ
         named_params_requires_grad.update(self.bsa_linear_params())
-        # --bnのパラメータ生成に使うベクトルを入れるlinear（1x1convでは使用しない）
+        # --bnのパラメータ生成に使うベクトルを入れるlinear
         named_params_requires_grad.update(self.calss_conditional_embeddings_params())
-        # --ベクトルをembeddingする（1x1convでは使用しない）
+        # --ベクトルをembeddingする
         named_params_requires_grad.update(self.embeddings_params())
-
-        # --1x1convに関するもの
-        # named_params_requires_grad.update(self.conv1x1_params())
-        # named_params_requires_grad.update(self.conv1x1_first_params())
 
         # --1x1convのパラメータを生成するFC層
         named_params_requires_grad.update(self.conv1x1_paramG_weights_params())
