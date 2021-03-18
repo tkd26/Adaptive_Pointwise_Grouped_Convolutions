@@ -181,7 +181,7 @@ def main(args):
     since = time.time()
 
     min_loss = {
-        'data': 1000, # 適当な大きい数字
+        'data': 1000,
         'epoch': 0,
     }
     
@@ -210,9 +210,9 @@ def main(args):
                 loss = criterion(img_generated,img,embeddings,model.linear.weight)
                 losses.update(loss.item(), img.size(0))
                 #compute gradient and do SGD step
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+                # optimizer.zero_grad()
+                # loss.backward()
+                # optimizer.step()
 
             elif args.mode == 'eval':
                 if args.KMMD:
@@ -223,9 +223,9 @@ def main(args):
                     eval_kmmd.update(kmmd.item(), img.size(0))
 
         if args.mode == 'train':
-            # optimizer.zero_grad()
-            # loss.backward()
-            # optimizer.step()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
             
             if epoch % print_freq == 0:
                 if min_loss['data'] > losses.avg:
@@ -245,7 +245,8 @@ def main(args):
                 save_checkpoint(checkpoint_dir,device,model,iteration=epoch )
 
         elif args.mode == 'eval':
-            if (epoch - 1) * args.data_num > 10000: # eval用のデータ数は10,000
+            if epoch * args.data_num > 10000: # eval用のデータ数は10,000
+            # if epoch * args.batch > 10000: # eval用のデータ数は10,000
                 if args.KMMD:
                     print('KMMD:', eval_kmmd.avg)
                 if args.FID:
@@ -258,7 +259,6 @@ def main(args):
         if epoch > max_epoch:
             break
         epoch+=1
-
     
     if args.mode == 'train':
         log_save_path = os.path.join(checkpoint_dir,"train-log.json")
