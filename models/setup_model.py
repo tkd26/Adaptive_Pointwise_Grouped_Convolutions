@@ -130,9 +130,9 @@ def setup_model(name,dataset_size,resume=None,biggan_imagenet_pretrained_model_p
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
         model = AdaBIGGAN_conv1x1(G,dataset_size=dataset_size)
     elif name=="biggan128-conv1x1-2":
-        G = biggan_conv1x1_2.Generator(**bigagn128config)
+        G = biggan_conv1x1_3.Generator(**bigagn128config)
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))
-        model = AdaBIGGAN_conv1x1_2(bigagn128config,G,dataset_size=dataset_size,groups=groups)
+        model = AdaBIGGAN_conv1x1_3(bigagn128config,G,dataset_size=dataset_size,per_groups=per_groups)
     elif name=="biggan128-conv1x1-3":
         G = biggan_conv1x1_3.Generator(**bigagn128config)
         G.load_state_dict(torch.load(biggan_imagenet_pretrained_model_path,map_location=lambda storage, loc: storage))

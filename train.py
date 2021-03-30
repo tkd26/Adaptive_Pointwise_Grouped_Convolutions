@@ -95,14 +95,13 @@ def setup_optimizer(model_name,model,lr_g_batch_stat,lr_g_linear,lr_bsa_linear,l
     #     params.append({"params":list(model.embeddings_params().values()), "lr": 0.01 })
     #     # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
 
-    # elif model_name=='biggan128-conv1x1-2': # 旧モデル
-    #     # params.append({"params":list(model.conv1x1_params().values()), "lr": lr_g_batch_stat })
-    #     # params.append({"params":list(model.conv1x1_first_params().values()), "lr": lr_bsa_linear })
-    #     params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
-    #     params.append({"params":list(model.embeddings_params().values()), "lr": 0.1 })
-    #     # params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed})
-    #     params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_bsa_linear })
-    #     params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_bsa_linear })
+    elif model_name=='biggan128-conv1x1-2':
+        params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear = 0.0000001
+        params.append({"params":list(model.embeddings_params().values()), "lr": lr_embed }) # lr_embed = 0.05
+        params.append({"params":list(model.calss_conditional_embeddings_params().values()), "lr":lr_class_cond_embed}) # lr_class_cond_embed = 0.001
+        params.append({"params":list(model.conv1x1_paramG_weights_params().values()), "lr": lr_g_batch_stat }) # lr_g_batch_stat = 0.0005
+        params.append({"params":list(model.conv1x1_paramG_biases_params().values()), "lr": lr_g_batch_stat }) # lr_g_batch_stat = 0.0005
+        params.append({"params":list(model.bsa_linear_params().values()), "lr":lr_bsa_linear }) # lr_bsa_linear = 0.0005
 
     elif model_name=='biggan128-conv1x1-3': # メインで使用しているモデル
         params.append({"params":list(model.linear_gen_params().values()), "lr":lr_g_linear }) # lr_g_linear
@@ -140,9 +139,7 @@ def main(args):
         model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained)
     elif args.model == "biggan128-conv1x1":
         model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained)
-    elif args.model == 'biggan128-conv1x1-2':
-        model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained,groups=args.groups)
-    elif args.model == 'biggan128-conv1x1-3':
+    elif args.model == 'biggan128-conv1x1-2' or args.model == 'biggan128-conv1x1-3':
         model = setup_model(args.model,dataset_size=dataset_size,resume=args.resume,biggan_imagenet_pretrained_model_path=args.pretrained,per_groups=args.per_groups)
     else:
         print('Error: Model not defined')
