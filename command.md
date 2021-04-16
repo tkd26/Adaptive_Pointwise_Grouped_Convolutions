@@ -1,7 +1,7 @@
 ## 評価方法
 ### eval
 ```
-<train時のコマンド> --mode eval --KMMD --FID --resume ./experiments/<モデルのパス>/checkpoint_iter30000.pth.tar
+<train時のコマンド> --mode eval --KMMD --FID --resume ./experiments//checkpoint_iter30000.pth.tar
 ```
 
 ### FID
