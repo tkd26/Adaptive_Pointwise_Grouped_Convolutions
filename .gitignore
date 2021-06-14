@@ -1,10 +1,8 @@
-data
 samples
-experiments
+experiments/*
 outputs
-official_biggan_pytorch
+# official_biggan_pytorch
 *.txt
-*.yml
 *.pyc
 deploy.prototxt
 res10_300x300_ssd_iter_140000_fp16.caffemodel
