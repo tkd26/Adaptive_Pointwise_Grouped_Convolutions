@@ -173,7 +173,7 @@ class AdaBIGGAN(nn.Module):
                         weight_init = weight_init.repeat(conv1x1_1_weight.shape[0], conv1x1_1_weight.shape[1]//self.per_groups, 1, 1, 1)
                     else:
                         weight_init = torch.eye(conv1x1_1_weight.shape[1]).unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
-                        weight_init = weight_init.repeat(conv1x1_1_weight.shape[0], conv1x1_1_weight.shape[1], 1, 1, 1)
+                        # weight_init = weight_init.repeat(conv1x1_1_weight.shape[0], conv1x1_1_weight.shape[1], 1, 1, 1)
                     conv1x1_1_weight += weight_init.cuda()
                     conv1x1_1_bias = self.conv1x1_paramG_biases[i](ys[index]).squeeze(0)
 
@@ -200,7 +200,7 @@ class AdaBIGGAN(nn.Module):
                         weight_init = weight_init.repeat(conv1x1_2_weight.shape[0], conv1x1_2_weight.shape[1]//self.per_groups, 1, 1, 1)
                     else:
                         weight_init = torch.eye(conv1x1_2_weight.shape[1]).unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
-                        weight_init = weight_init.repeat(conv1x1_2_weight.shape[0], conv1x1_2_weight.shape[1], 1, 1, 1)
+                        # weight_init = weight_init.repeat(conv1x1_2_weight.shape[0], conv1x1_2_weight.shape[1], 1, 1, 1)
                     conv1x1_2_weight += weight_init.cuda()
                     conv1x1_2_bias = self.conv1x1_paramG_biases[i+1](ys[index]).squeeze(0)
 
